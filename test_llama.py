@@ -10,12 +10,38 @@ import torch
 from tqdm import tqdm
 from collections import defaultdict
 
-checkpoint_dir = "llama_models/llama-7-chat-int4-msmarco-rank/checkpoint-1000_merged" 
-checkpoint_dir = "llama_models/llama-13-chat-int4-msmarco-rank/checkpoint-1000" 
+
+# Set batch size and other relevant parameters
+batch_size = 1
+#checkpoint_dir = "llama_models/llama-13-chat-int4-msmarco-rank/checkpoint-1000" 
+checkpoint_dir = "llama_models/llama-7-chat-int4-msmarco-rank/checkpoint-100_merged" 
 cache_dir = '/scratch-shared/drautmp/transformers_cache/'
+
+
+dataset_name = 'data/msmarco/dl2020_54.bm25.passage.hf'
+dataset_name = 'data/msmarco/dl2020_single.bm25.passage.hf'
 
 #checkpoint_dir = 'meta-llama/Llama-2-7b-chat-hf'
 use_flash_attention = True
+load_unmerged = False
+
+qrels_file = 'data/msmarco/2020qrels-pass.txt'
+
+
+def format_instruction(sample):
+    return f"""### Instruction:
+Write a question that this passsage could answer.
+### Passage:
+{sample['document']}
+### Question:
+{sample['query']}
+"""
+
+#def format_instruction(sample):
+#    return f"write a question that this passsage could answer.\npassage:\n{sample['document']}\nquestion:\n{sample['query']}"
+
+
+
 
 if use_flash_attention:
     # unpatch flash attention
@@ -24,8 +50,6 @@ if use_flash_attention:
 
 tokenizer = AutoTokenizer.from_pretrained(checkpoint_dir, padding_side='right')
 tokenizer.add_special_tokens({"pad_token":"<pad>"})
-
-load_unmerged = True
 #load unmerged
 if load_unmerged:
     # load base LLM model and tokenizer
@@ -59,20 +83,6 @@ model.model.embed_tokens._fill_padding_idx_with_zero()
 
 
 
-def format_instruction(sample):
-    return f"""### Instruction:
-Write a question that this passsage could answer.
-### Passage:
-{sample['document']}
-### Question:
-{sample['query']}
-"""
-
-def format_instruction(sample):
-    return f"write a question that this passsage could answer.\npassage:\n{sample['document']}\nquestion:\n{sample['query']}"
-
-dataset_name = 'data/msmarco/dl2020_54.bm25.passage.hf'
-dataset_name = 'data/msmarco/dl2020_single.bm25.passage.hf'
 dataset = Dataset.load_from_disk(dataset_name)
 sample = dataset[randrange(len(dataset))]
 prompt = format_instruction(sample)
@@ -94,8 +104,6 @@ def collate_fn(batch):
     return qids, dids, instr_tokenized, target_tokenized
 
 
-# Set batch size and other relevant parameters
-batch_size = 1
 
 # Create a DataLoader
 dataloader = DataLoader(dataset, batch_size=batch_size, collate_fn=collate_fn, num_workers=4)
@@ -107,17 +115,11 @@ def get_scores(model, instr_tokenized, target_tokenized):
     loss_fct = CrossEntropyLoss(reduction='none', ignore_index=model.config.pad_token_id)
     logits_target = logits[:, -(target_tokenized.input_ids.shape[1] -1):-1, :].permute(0, 2, 1)
     target = target_tokenized.input_ids.to('cuda')[..., 2:]
+    print('target', tokenizer.batch_decode(target))
+    print('logits argmax', tokenizer.batch_decode(logits_target.max(1).indices))
     loss = loss_fct(logits_target, target)
     return -torch.exp(loss.mean(1).unsqueeze(1))
 
-
-#def get_scores(model, instr_tokenized, target_tokenized):
-#    logits = model(**instr_tokenized).logits
-#
-#    loss_fct = CrossEntropyLoss(reduction='none', ignore_index=model.config.pad_token_id)
-#    print(logits.permute(0,2,1)[..., :-1].shape, instr_tokenized.input_ids[..., 1:].shape)
-#    loss = loss_fct(logits.permute(0, 2, 1)[..., :-1], instr_tokenized.input_ids[..., 1:])
-#    return - torch.exp(loss.mean(1).unsqueeze(1))
 
 
 
@@ -143,7 +145,6 @@ with torch.inference_mode():
         sorted_scores.append(sorted_scores_q)
 
 
-qrels_file = 'data/msmarco/2020qrels-pass.txt'
 test = Trec('ndcg_cut_10', 'trec_eval', qrels_file, 1000, ranking_file_path=f'/tmp/')
 eval_score = test.score(sorted_scores, q_ids)
 print(eval_score)
