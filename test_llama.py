@@ -34,8 +34,7 @@ Write a question that this passsage could answer.
 ### Passage:
 {sample['document']}
 ### Question:
-{sample['query']}
-"""
+{sample['query']}"""
 
 #def format_instruction(sample):
 #    return f"write a question that this passsage could answer.\npassage:\n{sample['document']}\nquestion:\n{sample['query']}"
