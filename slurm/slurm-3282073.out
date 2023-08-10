@@ -1,0 +1,45 @@
+
+Thu Aug 10 16:05:43 2023       
++-----------------------------------------------------------------------------+
+| NVIDIA-SMI 520.61.05    Driver Version: 520.61.05    CUDA Version: 11.8     |
+|-------------------------------+----------------------+----------------------+
+| GPU  Name        Persistence-M| Bus-Id        Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp  Perf  Pwr:Usage/Cap|         Memory-Usage | GPU-Util  Compute M. |
+|                               |                      |               MIG M. |
+|===============================+======================+======================|
+|   0  NVIDIA A100-SXM...  On   | 00000000:CA:00.0 Off |                  Off |
+| N/A   28C    P0    47W / 400W |      0MiB / 40960MiB |      0%      Default |
+|                               |                      |             Disabled |
++-------------------------------+----------------------+----------------------+
+                                                                               
++-----------------------------------------------------------------------------+
+| Processes:                                                                  |
+|  GPU   GI   CI        PID   Type   Process name                  GPU Memory |
+|        ID   ID                                                   Usage      |
+|=============================================================================|
+|  No running processes found                                                 |
++-----------------------------------------------------------------------------+
+### Instruction:
+Write a question that this passsage could answer.
+### Passage:
+4. Fight and prevent breakouts. Apply a small dab of tea tree oil to a pimple or blemish. It helps control breakouts, is non-irritating and acts rapidly. You can also add a drop to your face wash and cream for its antibacterial benefits. 5. Treat dry cuticles and nails. Add a few drops of tea tree oil to a bottle of nail polish to promote nail growth, treat fungus and increase the strength and health of your nail beds.
+### Question:
+can you use tea tree oil on face
+Using flash attention
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:17<00:17, 17.02s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:23<00:00, 10.56s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:23<00:00, 11.53s/it]
+/home/drau/.local/lib/python3.10/site-packages/trl/trainer/sft_trainer.py:227: UserWarning: You passed `packing=True` to the SFTTrainer, and you are training your model with `max_steps` strategy. The dataset will be iterated until the `max_steps` are reached.
+  warnings.warn(
+wandb: Currently logged in as: d-m-rau. Use `wandb login --relogin` to force relogin
+wandb: wandb version 0.15.8 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Tracking run with wandb version 0.15.3
+wandb: Run data is saved locally in /gpfs/home3/drau/llm_rankers/wandb/run-20230810_160700-3ydn1y7u
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run worldly-planet-22
+wandb: ⭐️ View project at https://wandb.ai/d-m-rau/huggingface
+wandb: 🚀 View run at https://wandb.ai/d-m-rau/huggingface/runs/3ydn1y7u
+lora modules {'gate_proj', 'down_proj', 'up_proj', 'k_proj', 'q_proj', 'v_proj', 'o_proj'}
+trainable params: 159,907,840 || all params: 3,660,328,960 || trainable%: 4.368674011201441
+None
+  0%|          | 0/5000 [00:00<?, ?it/s]You're using a LlamaTokenizerFast tokenizer. Please note that with a fast tokenizer, using the `__call__` method is faster than using a method to encode the text followed by a call to the `pad` method to get a padded encoding.
+  0%|          | 1/5000 [00:30<42:57:41, 30.94s/it]  0%|          | 2/5000 [01:00<41:27:31, 29.86s/it]  0%|          | 3/5000 [01:29<40:58:15, 29.52s/it]  0%|          | 4/5000 [01:58<40:44:17, 29.36s/it]  0%|          | 5/5000 [02:27<40:36:17, 29.26s/it]  0%|          | 6/5000 [02:56<40:31:26, 29.21s/it]

@@ -9,21 +9,21 @@ from torch.utils.data import DataLoader
 import torch
 from tqdm import tqdm
 from collections import defaultdict
-
-
+import sys
+import os
 # Set batch size and other relevant parameters
 batch_size = 1
-#checkpoint_dir = "llama_models/llama-13-chat-int4-msmarco-rank/checkpoint-1000" 
-checkpoint_dir = "llama_models/llama-7-chat-int4-msmarco-rank/checkpoint-100_merged" 
-cache_dir = '/scratch-shared/drautmp/transformers_cache/'
-
-
-dataset_name = 'data/msmarco/dl2020_54.bm25.passage.hf'
-dataset_name = 'data/msmarco/dl2020_single.bm25.passage.hf'
+checkpoint_dir = sys.argv[1]
 
 #checkpoint_dir = 'meta-llama/Llama-2-7b-chat-hf'
+cache_dir = '/scratch-shared/drautmp/transformers_cache/'
+dataset_name = 'data/msmarco/dl2020_54.bm25.passage.hf'
+#dataset_name = 'data/msmarco/dl2020_single.bm25.passage.hf'
+
+output_dir = checkpoint_dir + dataset_name.split('/')[-1] + '_non_formatted_prompt' +'/run'
+os.makedirs(output_dir, exist_ok=True)
 use_flash_attention = True
-load_unmerged = False
+load_unmerged = True
 
 qrels_file = 'data/msmarco/2020qrels-pass.txt'
 
@@ -36,8 +36,8 @@ Write a question that this passsage could answer.
 ### Question:
 {sample['query']}"""
 
-#def format_instruction(sample):
-#    return f"write a question that this passsage could answer.\npassage:\n{sample['document']}\nquestion:\n{sample['query']}"
+def format_instruction(sample):
+    return f"write a question that this passsage could answer.\npassage:\n{sample['document']}\nquestion:\n{sample['query']}"
 
 
 
@@ -55,15 +55,15 @@ if load_unmerged:
     unmerged_model = AutoPeftModelForCausalLM.from_pretrained(
         checkpoint_dir,
         low_cpu_mem_usage=True,
-        #torch_dtype=torch.float16,
+        torch_dtype=torch.float16,
         #load_in_4bit=True,
         cache_dir=cache_dir,
         device_map='auto'        
     )
     model = unmerged_model.merge_and_unload()
     # Save the merged model
-    model.save_pretrained(checkpoint_dir + '_merged', safe_serialization=True)
-    tokenizer.save_pretrained(checkpoint_dir+'_merged')
+    #model.save_pretrained(checkpoint_dir + '_merged', safe_serialization=True)
+    #tokenizer.save_pretrained(checkpoint_dir+'_merged')
 else:
     quant_config = BitsAndBytesConfig(
     load_in_4bit=True,
@@ -79,7 +79,7 @@ model.resize_token_embeddings(len(tokenizer))
 model.model.embed_tokens.padding_idx = len(tokenizer) - 1
 model.model.embed_tokens._fill_padding_idx_with_zero()
 
-
+model.config.use_cache = False
 
 
 dataset = Dataset.load_from_disk(dataset_name)
@@ -114,8 +114,6 @@ def get_scores(model, instr_tokenized, target_tokenized):
     loss_fct = CrossEntropyLoss(reduction='none', ignore_index=model.config.pad_token_id)
     logits_target = logits[:, -(target_tokenized.input_ids.shape[1] -1):-1, :].permute(0, 2, 1)
     target = target_tokenized.input_ids.to('cuda')[..., 2:]
-    print('target', tokenizer.batch_decode(target))
-    print('logits argmax', tokenizer.batch_decode(logits_target.max(1).indices))
     loss = loss_fct(logits_target, target)
     return -torch.exp(loss.mean(1).unsqueeze(1))
 
@@ -144,6 +142,6 @@ with torch.inference_mode():
         sorted_scores.append(sorted_scores_q)
 
 
-test = Trec('ndcg_cut_10', 'trec_eval', qrels_file, 1000, ranking_file_path=f'/tmp/')
+test = Trec('ndcg_cut_10', 'trec_eval', qrels_file, 1000, ranking_file_path=output_dir)
 eval_score = test.score(sorted_scores, q_ids)
 print(eval_score)
