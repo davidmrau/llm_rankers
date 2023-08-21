@@ -27,7 +27,7 @@ config = json.loads(open('config.json').read())
 query_file = config['train']['pass']['queries']
 document_file = config['train']['pass']['docs']
 #triples_file = config['train']['pass']['triples']
-triples_file = 'data/msmarco/qidpidtriples.train.full.10m.tsv'
+triples_file = 'data/msmarco/qidpidtriples.train.full.100k.tsv'
 
 
 # Create an iterative dataset
@@ -35,5 +35,5 @@ dataset = Dataset.from_generator(
     triples_generator)
 
 
-dataset.save_to_disk("data/msmarco/msmarco.10m.hf")
+dataset.save_to_disk("data/msmarco/msmarco.100k.hf")
 

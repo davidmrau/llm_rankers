@@ -1,13 +1,11 @@
-# copied from https://github.com/philschmid/deep-learning-pytorch-huggingface/blob/main/training/utils/llama_patch.py
-
-
 from typing import List, Optional, Tuple
 
 import torch
 from torch import nn
 import warnings
 import transformers
-from transformers.models.llama.modeling_llama import apply_rotary_pos_emb
+from transformers.models.llama.modeling_llama import apply_rotary_pos_emb, repeat_kv
+from peft.tuners.lora import LoraLayer
 
 try:
     from flash_attn.flash_attn_interface import flash_attn_varlen_qkvpacked_func
@@ -40,16 +38,20 @@ def forward(
 
     attention_mask: [bsz, q_len]
     """
+    if self.config.pretraining_tp != 1:
+        raise ValueError("Only model.config.pretraining_tp=1 is supported but is", self.config.pretraining_tp)
+
+    bsz, q_len, _ = hidden_states.size()
     if output_attentions:
         warnings.warn("Output attentions is not supported for patched `LlamaAttention`, returning `None` instead.")
 
-    bsz, q_len, _ = hidden_states.size()
+    query_states = self.q_proj(hidden_states)
+    key_states = self.k_proj(hidden_states)
+    value_states = self.v_proj(hidden_states)
 
-    query_states = self.q_proj(hidden_states).view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
-    key_states = self.k_proj(hidden_states).view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
-    value_states = self.v_proj(hidden_states).view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
-    # [bsz, q_len, nh, hd]
-    # [bsz, nh, q_len, hd]
+    query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
+    key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+    value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
 
     kv_seq_len = key_states.shape[-2]
     if past_key_value is not None:
@@ -64,13 +66,9 @@ def forward(
         value_states = torch.cat([past_key_value[1], value_states], dim=2)
 
     past_key_value = (key_states, value_states) if use_cache else None
-
-    # PEFT Int4 support
-    query_states, key_states, value_states = [x.to(torch.bfloat16) for x in [query_states, key_states, value_states]]
-
-    assert all(
-        (i.dtype in [torch.float16, torch.bfloat16] for i in (query_states, key_states, value_states))
-    ), "shit not all types"
+    # repeat k/v heads if n_kv_heads < n_heads
+    key_states = repeat_kv(key_states, self.num_key_value_groups)
+    value_states = repeat_kv(value_states, self.num_key_value_groups)
 
     # Flash attention codes from
     # https://github.com/HazyResearch/flash-attention/blob/main/flash_attn/flash_attention.py
@@ -101,7 +99,13 @@ def forward(
             "b s (h d) -> b s h d",
             h=nheads,
         )
-    return self.o_proj(rearrange(output, "b s h d -> b s (h d)")), None, past_key_value
+    
+        output = output.transpose(1, 2).contiguous()
+        output = output.reshape(bsz, q_len, self.hidden_size)
+
+    attn_output = self.o_proj(output)
+
+    return attn_output, None, past_key_value
 
 
 # Disable the transformation of the attention mask in LlamaModel as the flash attention
@@ -130,3 +134,19 @@ def unplace_flash_attn_with_attn():
 
     print("Reloading llama model, unpatching flash attention")
     importlib.reload(transformers.models.llama.modeling_llama)
+
+
+# Adapted from https://github.com/tmm1/axolotl/blob/2eda9e02a9d15a7a3f92b41f257d9844d72fc220/src/axolotl/utils/models.py#L338
+def upcast_layer_for_flash_attention(model, torch_dtype):
+    # LlamaRMSNorm layers are in fp32 after kbit_training, so we need to
+    # convert them back to fp16/bf16 for flash-attn compatibility.
+    for name, module in model.named_modules():
+        if isinstance(module, LoraLayer):
+            module.to(torch_dtype)
+        if "norm" in name:
+            module.to(torch_dtype)
+        if "lm_head" in name or "embed_tokens" in name:
+            if hasattr(module, "weight"):
+                module.to(torch_dtype)
+
+    return model

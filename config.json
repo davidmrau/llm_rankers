@@ -1,0 +1,266 @@
+{
+    "prompt":{
+
+	"repeat": "repeat the following: '{}'",
+	"ppl": "write a question that this passsage could answer.\npassage:\n{}\nquestion:\n{}",
+	"score": "Score the following document with respect to the reference on a continuous scale from 0 to 100, where score of 0 means \"no meaning preserved\", 50 means \"similar meaning\" 100  means \"perfect meaning\". The answer contains only the score. reference: \"{}\" , document: \"{}\" score:",
+    	"cross": "query {}, document: {}, score: ",
+	"cross_instr": "Score the following document with respect to the query on a continuous scale from 0 to 100, where score of zero means \"no meaning preserved\" and score of one hundred means \"perfect meaning\". Generate only the score as a float. query: \"{}\" docuemnts \"{}\" Score:",
+	"helm_ranking": "Does the passage answer the query?\nQuery: '{}'\nPassage: '{}'\nAnswer:",
+	"helm_ranking_desc": "Does the passage answer the query taking the relevance instructions into account?\nQuery: '{}'\nRelevance Instructions:\n'{}'\nPassage: '{}'\nAnswer:"
+
+    },
+    "train": {
+
+		"example": {
+			"triples": "examples/triples.tsv",
+			"queries": "examples/queries.tsv",
+			"docs": "examples/docs.tsv"
+		}, 
+
+        "pass" : {
+            "triples": "data/msmarco/qidpidtriples.train.full.tsv",
+            "queries": "data/msmarco/queries.train.tsv",
+            "docs": "data/msmarco/collection.tsv"
+        },
+
+
+        "pass_distil" : {
+            "triples": "data/msmarco/cross-encoder-ms-marco-MiniLM-L-6-v2-scores.pkl.gz",
+            "queries": "data/msmarco/queries.train.tsv",
+            "docs": "data/msmarco/collection.tsv", 
+	    "qrels": "data/msmarco/qrels.json"
+        },
+
+        "doc": {
+            "triples": "data/msmarco_docs/triples.tsv",
+            "queries": "data/msmarco_docs/msmarco-doctrain-queries.tsv",
+            "docs": "data/msmarco_docs/msmarco-docs.in_triples.title+body.tsv"
+        },	
+        "doc_tfidf" : {
+            "triples": "data/msmarco_docs/triples.tsv",
+            "queries": "data/msmarco_docs/msmarco-doctrain-queries.tsv",
+            "docs": "data/msmarco_docs/msmarco-docs.in_triples.tfidf_decr.tsv"
+        },
+        "doc_plm" : {
+            "triples": "data/msmarco_docs/triples.tsv",
+            "queries": "data/msmarco_docs/msmarco-doctrain-queries.tsv",
+            "docs": "data/msmarco_docs/msmarco-docs.in_triples.title+body_plm.jsonl_sorted.jsonl"
+        }
+
+    },
+
+    "test": {
+
+		"example": {
+			"qrels": "examples/qrels.tsv",
+			"trec_run": "examples/trec_run.txt",
+			"queries": "examples/queries.tsv",
+			"docs": "examples/docs.tsv"
+		},
+        
+        "2019_pass" : {
+            "qrels": "data/msmarco/2019qrels-pass.txt",
+            "trec_run": "data/msmarco/msmarco-passagetest2019-top1000_43_ranking_results_style.t",
+            "queries": "data/msmarco/msmarco-test2019-queries_43.tsv",
+            "docs": "data/msmarco/collection.tsv"
+
+        },
+        "2019_doc" : {
+            "qrels": "data/msmarco_docs/2020qrels-docs.txt",
+            "trec_run": "data/msmarco_docs/msmarco-doctest2020-top100_judged",
+            "queries": "data/msmarco_docs/msmarco-test2020-queries.tsv",
+            "docs": "data/msmarco_docs/msmarco-docs.tsv_test_2020.tsv"
+
+        },
+
+        "2020_pass_bm25" : {
+            "qrels": "data/msmarco/2020qrels-pass.txt",
+            "trec_run": "data/msmarco/run.msmarco-passage.bm25.topics.dl20_54.txt",
+            "queries": "data/msmarco/msmarco-test2020-queries.tsv",
+            "docs": "data/msmarco/collection.tsv"
+        },
+        "2020_pass_bm25_chatgpt" : {
+            "qrels": "data/msmarco/2020qrels-pass.txt",
+            "trec_run": "data/msmarco/run.msmarco-passage.bm25.topics.dl20_54.txt",
+            "queries": "data/msmarco/chat-gpt.msmarco-passagetest2020_54.tsv",
+            "docs": "data/msmarco/collection.tsv"
+        },
+
+        "2020_pass_bm25_100" : {
+            "qrels": "data/msmarco/2020qrels-pass.txt",
+            "trec_run": "data/msmarco/run.msmarco-passage.bm25.topics.dl20_54.txt_top_100",
+            "queries": "data/msmarco/msmarco-test2020-queries.tsv",
+            "docs": "data/msmarco/collection.tsv"
+        },
+        "2020_pass_bm25_100_single" : {
+            "qrels": "data/msmarco/2020qrels-pass.txt",
+            "trec_run": "data/msmarco/run.msmarco-passage.bm25.topics.dl20_54.txt_top_100_single",
+            "queries": "data/msmarco/msmarco-test2020-queries.tsv",
+            "docs": "data/msmarco/collection.tsv"
+        },
+
+        "2020_pass" : {
+            "qrels": "data/msmarco/2020qrels-pass.txt",
+            "trec_run": "data/msmarco/msmarco-passagetest2020-top1000_ranking_results_style_54.tsv",
+            "queries": "data/msmarco/msmarco-test2020-queries.tsv",
+            "docs": "data/msmarco/collection.tsv"
+        },
+        "2020_pass_chatgpt" : {
+            "qrels": "data/msmarco/2020qrels-pass.txt",
+            "trec_run": "data/msmarco/msmarco-passagetest2020-top1000_ranking_results_style_54.tsv",
+            "queries": "data/msmarco/chat-gpt.msmarco-passagetest2020_54.tsv",
+            "docs": "data/msmarco/collection.tsv"
+        },
+        "2020_pass_chatgpt_doc" : {
+            "qrels": "data/msmarco/2020qrels-pass.txt",
+            "docs": "data/msmarco/chat-gpt.msmarco-passagetest2020_54_doc.tsv",
+            "queries": "data/msmarco/msmarco-test2020-queries.tsv",
+            "trec_run": "data/msmarco/chatgpt.run.trec"
+        },
+        "2020_pass_chatgpt_top_100" : {
+            "qrels": "data/msmarco/2020qrels-pass.txt",
+            "trec_run": "data/msmarco/run.msmarco-passage.bm25.topics.dl20_54.txt_top_100",
+            "queries": "data/msmarco/chat-gpt.msmarco-passagetest2020_54.tsv",
+            "docs": "data/msmarco/collection.tsv"
+        },
+        "2020_pass_chatgpt_top_100_single" : {
+            "qrels": "data/msmarco/2020qrels-pass.txt",
+            "trec_run": "data/msmarco/run.msmarco-passage.bm25.topics.dl20_54.txt_top_100_single_q",
+            "queries": "data/msmarco/chat-gpt.msmarco-passagetest2020_54.tsv",
+            "docs": "data/msmarco/collection.tsv"
+        },
+        "2020_pass_top_100_plm" : {
+            "qrels": "data/msmarco/2020qrels-pass.txt",
+            "trec_run": "ranking_opt_doc/passages/run.msmarco-passage.bm25.topics.dl20.judged.txt_top_100",
+            "queries": "data/msmarco/msmarco-test2020-queries.tsv",
+            "docs": "ranking_opt_doc/passages/plm/collection.2020.tsv_plm_128.tsv"
+        },
+        "2020_pass_top_100" : {
+            "qrels": "data/msmarco/2020qrels-pass.txt",
+            "trec_run": "ranking_opt_doc/run.msmarco-passage.bm25.topics.dl20.judged.txt_top_100",
+            "queries": "data/msmarco/msmarco-test2020-queries.tsv",
+            "docs": "data/msmarco/collection.tsv"
+        },
+        "2020_doc" : {
+            "qrels": "data/msmarco_docs/2020qrels-docs.txt",
+            "trec_run": "data/msmarco_docs/msmarco-doctest2020-top100_judged",
+            "queries": "data/msmarco_docs/msmarco-test2020-queries.tsv",
+            "docs": "data/msmarco_docs/msmarco-docs.tsv_test_2020.tsv"
+
+        },
+        "2020_doc_plm_512" : {
+            "qrels": "data/msmarco_docs/2020qrels-docs.txt",
+            "trec_run": "data/msmarco_docs/msmarco-doctest2020-top100_judged",
+            "queries": "data/msmarco_docs/msmarco-test2020-queries.tsv",
+            "docs": "ranking_opt_doc/docs/plm/msmarco-docs.tsv_test_2020.tsv_plm_512.tsv"
+        },
+
+
+        "2020_doc_minilm12plm64" : {
+            "qrels": "data/msmarco_docs/2020qrels-docs.txt",
+            "trec_run": "runs/2019_docs_tfidf_minilm6plm_64_eval/model_eval_ranking.trec_top_10",
+            "queries": "data/msmarco_docs/msmarco-test2020-queries.tsv",
+            "docs": "data/msmarco_docs/msmarco-docs.tsv_test_2020.tsv"
+
+        },
+        "2020_doc_bm25" : {
+            "qrels": "data/msmarco_docs/2020qrels-docs.txt",
+            "trec_run": "data/msmarco_docs/msmarco-doctest2020-top100_judged_top_10",
+            "queries": "data/msmarco_docs/msmarco-test2020-queries.tsv",
+            "docs": "data/msmarco_docs/msmarco-docs.tsv_test_2020.tsv"
+
+        },
+        "2020_doc_plm" : {
+            "qrels": "data/msmarco_docs/2020qrels-docs.txt",
+            "trec_run": "data/msmarco_docs/msmarco-doctest2020-top100_judged",
+            "queries": "data/msmarco_docs/msmarco-test2020-queries.tsv",
+            "docs": "data/msmarco_docs/msmarco-docs.tsv_test_2020_plm.jsonl_sorted.jsonl"
+
+        },
+        "2021_pass" : {
+            "qrels": "data/msmarco/2021.qrels.pass.final.txt",
+            "trec_run": "",
+            "queries": "data/msmarco_2/2021_queries.tsv",
+            "docs": "data/msmarco_2/passages_provided_top_100.tsv"
+
+        },
+        "2023_pass" : {
+            "qrels": "",
+            "trec_run": "data/msmarco/2023_passage_top100.txt",
+            "queries": "data/msmarco/2023_queries.tsv",
+            "docs": "data/msmarco/2023_passasges.tsv"
+
+        },
+        "2021_doc" : {
+            "qrels": "data/msmarco_docs/2021.qrels.docs.final.txt",
+            "trec_run": "data/msmarco_docs/2021_document_top100_judged.txt",
+            "queries": "data/msmarco_docs/2021_queries.tsv",
+            "docs": "data/msmarco_docs/msmarco_v2_2021_judged.tsv"
+
+        },
+        "2022_doc" : {
+            "qrels": "data/msmarco_2/2022.qrels.docs.inferred.txt",
+            "trec_run": "data/msmarco_2/2022_document_top100.txt",
+            "queries": "data/msmarco_2/2022_queries.tsv",
+            "docs": "data/msmarco_2/2022_docs_nist.tsv"
+
+        },
+        "clueweb" : {
+            "qrels": "data/clue/qrels.web.1-200.txt",
+            "trec_run": "data/clue/topics.web.1-200.xml.run.cw09b.bm25.top-100_stemmed_remove_stop_spam_filtered_self_extracted",
+            "queries": "data/clue/topics.web.1-200.txt",
+            "docs": "data/clue/clueweb09b_docs_cleaned_docs_in_run_spam_filtered_100"
+
+        },
+        "robust" : {
+            "qrels": "data/robust_test/qrels.robust2004.txt",
+            "trec_run": "data/robust_test/run.robust04.bm25.no_stem.trec_top_100",
+            "queries": "data/robust_test/04.testset_num_query_lower",
+            "docs": "data/robust/robust04_raw_docs.num_query"
+
+        },
+        "robust_desc" : {
+            "qrels": "data/robust_test/qrels.robust2004.txt",
+            "trec_run": "data/robust_test/run.robust04.bm25.no_stem.trec_top_100",
+            "queries": "data/robust_test/04.test.jsonl",
+            "docs": "data/robust/robust04_raw_docs.num_query"
+
+        },
+        "robust_plm" : {
+            "qrels": "data/robust_test/qrels.robust2004.txt",
+            "trec_run": "data/robust_test/run.robust04.bm25.no_stem.trec_top_100",
+            "queries": "data/robust_test/04.testset_num_query_lower",
+            "docs": "data/robust/docs_plm.jsonl_sorted.test.jsonl"
+
+        },
+        "robust_bm25" : {
+            "qrels": "data/robust_test/qrels.robust2004.txt",
+            "trec_run": "data/robust_test/run.robust04.bm25.no_stem.trec_top_100_top_10",
+            "queries": "data/robust_test/04.testset_num_query_lower",
+            "docs": "data/robust/robust04_raw_docs.num_query"
+
+        },
+        "robust_minilm12plm64" : {
+            "qrels": "data/robust_test/qrels.robust2004.txt",
+            "trec_run": "runs//robust_minilm12plm_64_eval/model_eval_ranking.trec_top_10",
+            "queries": "data/robust_test/04.testset_num_query_lower",
+            "docs": "data/robust/robust04_raw_docs.num_query"
+
+        },
+        "robust_100_callan" : {
+            "qrels": "data/distributed_ir/qrel.51-150",
+            "trec_run": "data/distributed_ir/run.all_trec.bm25.topics.adhoc.51-200.txt",
+            "queries": "data/distributed_ir/topics.adhoc.51-200.txt.tsv",
+            "docs": "data/distributed_ir/trec_123.tsv"
+
+        },
+        "robust_100_kmeans" : { 
+            "qrels": "data/distributed_ir/qrels.adhoc.201-250.txt",
+            "trec_run": "data/distributed_ir/run.all_trec.bm25.topics.desc.adhoc.201-250.disks23.txt",
+            "queries": "data/distributed_ir/topics.adhoc.201-250.txt.desc.tsv",
+            "docs": "data/distributed_ir/trec_23.tsv"
+
+        }
+    }
+}

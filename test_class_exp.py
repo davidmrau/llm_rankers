@@ -11,16 +11,16 @@ from tqdm import tqdm
 from collections import defaultdict
 import sys
 import os
+
+import pickle
 # Set batch size and other relevant parameters
 batch_size = 1
 checkpoint_dir = sys.argv[1]
 
-#checkpoint_dir = 'meta-llama/Llama-2-7b-chat-hf'
-cache_dir = '/scratch-shared/drautmp/transformers_cache/'
-dataset_name = 'data/msmarco/dl2020_54.bm25.passage.hf'
+dataset_name = 'data/msmarco/dl2020_54.bm25.passage.ref.hf'
 #dataset_name = 'data/msmarco/dl2020_single.bm25.passage.hf'
 
-output_dir = checkpoint_dir + dataset_name.split('/')[-1] + '_non_formatted_prompt' +'/run'
+output_dir = checkpoint_dir + dataset_name.split('/')[-1] +'_exp/run'
 os.makedirs(output_dir, exist_ok=True)
 use_flash_attention = True
 load_unmerged = True
@@ -28,27 +28,47 @@ load_unmerged = True
 qrels_file = 'data/msmarco/2020qrels-pass.txt'
 
 
-def format_instruction(sample):
-    return f"""### Instruction:
-Write a question that this passsage could answer.
-### Passage:
-{sample['document']}
-### Question:
-{sample['query']}"""
 
 def format_instruction(sample):
     return f"write a question that this passsage could answer.\npassage:\n{sample['document']}\nquestion:\n{sample['query']}"
 
 
+def format_instruction(sample):
+    q = sample['query']
+    p = sample['document']
+    return f"Does the passage answer the query?\nQuery: '{q}'\nPassage: '{p}'\nAnswer:"
 
 
+#Passage1 is the perfect answer to the query. Does Passage2 answer the query better as Passage1?
+def format_instruction(sample):
+    return f"""### Instruction:
+Does Passage 2 answer the query better than Passage 1? yes or no?
+### Query:
+{sample['query']}
+### Passage #1:
+{sample['gen_rel_document']}
+### Passage #2:
+{sample['document']}
+### Answer:
+"""
+def format_instruction(sample):
+    return f"""### Instruction:
+Does the passage answer the query? True or False?
+### Query:
+{sample['query']}
+### Passage:
+{sample['document']}
+### Answer:
+"""
 if use_flash_attention:
     # unpatch flash attention
     from llama_patch import unplace_flash_attn_with_attn
     unplace_flash_attn_with_attn()
 
-tokenizer = AutoTokenizer.from_pretrained(checkpoint_dir, padding_side='right')
+print(checkpoint_dir)
+tokenizer = AutoTokenizer.from_pretrained(checkpoint_dir)
 tokenizer.add_special_tokens({"pad_token":"<pad>"})
+tokenizer.padding_side = 'right'
 #load unmerged
 if load_unmerged:
     # load base LLM model and tokenizer
@@ -57,7 +77,6 @@ if load_unmerged:
         low_cpu_mem_usage=True,
         torch_dtype=torch.float16,
         #load_in_4bit=True,
-        cache_dir=cache_dir,
         device_map='auto'        
     )
     model = unmerged_model.merge_and_unload()
@@ -71,7 +90,7 @@ else:
     bnb_4bit_compute_dtype='float16',
     bnb_4bit_use_dobule_quant=False
     )
-    model = AutoModelForCausalLM.from_pretrained(checkpoint_dir, cache_dir=cache_dir, device_map='auto', quantization_config=quant_config)
+    model = AutoModelForCausalLM.from_pretrained(checkpoint_dir, device_map='auto', quantization_config=quant_config)
 
 model.config.pretraining_tp = 1
 model.config.pad_token_id = tokenizer.pad_token_id
@@ -89,6 +108,8 @@ prompt = format_instruction(sample)
 def remove_token_type_ids(inp):
     if 'token_type_ids' in inp:
         del inp['token_type_ids']
+    if 'attention_mask' in inp:
+        del inp['attention_mask']
 
 
 def collate_fn(batch):
@@ -107,31 +128,50 @@ def collate_fn(batch):
 # Create a DataLoader
 dataloader = DataLoader(dataset, batch_size=batch_size, collate_fn=collate_fn, num_workers=4)
 
+True_tokenid = tokenizer.encode('True', add_special_tokens=False)[-1]
+False_tokenid = tokenizer.encode('False', add_special_tokens=False)[-1]
+true_tokenid = tokenizer.encode('true', add_special_tokens=False)[-1]
+false_tokenid = tokenizer.encode('false', add_special_tokens=False)[-1]
+yes_tokenid = tokenizer.encode('yes', add_special_tokens=False)[-1]
+no_tokenid = tokenizer.encode('no', add_special_tokens=False)[-1]
+Yes_tokenid = tokenizer.encode('Yes', add_special_tokens=False)[-1]
+No_tokenid = tokenizer.encode('No', add_special_tokens=False)[-1]
+y_tokenid = tokenizer.encode('y', add_special_tokens=False)[-1]
+n_tokenid = tokenizer.encode('n', add_special_tokens=False)[-1]
 
-def get_scores(model, instr_tokenized, target_tokenized):
+false_tokenid = 4541
+true_tokenid = 3009
+def get_scores(model, instr_tokenized, target_tokenized, print_bool):
     remove_token_type_ids(instr_tokenized)
-    logits = model(**instr_tokenized.to('cuda')).logits
-    loss_fct = CrossEntropyLoss(reduction='none', ignore_index=model.config.pad_token_id)
-    logits_target = logits[:, -(target_tokenized.input_ids.shape[1] -1):-1, :].permute(0, 2, 1)
-    target = target_tokenized.input_ids.to('cuda')[..., 2:]
-    loss = loss_fct(logits_target, target)
-    return -torch.exp(loss.mean(1).unsqueeze(1))
+    scores = model.generate(**instr_tokenized.to('cuda'), max_new_tokens=1, do_sample=False, output_scores=True, return_dict_in_generate=True).scores
+    scores = torch.stack(scores)
+    raw_scores = scores.clone()
+    if print_bool:
+        print('max prob token', tokenizer.batch_decode(scores.max(2).indices), scores.max(2).indices.ravel().item() ,scores.max(2).values.ravel().item())
+        print(scores[0, :, [True_tokenid, False_tokenid, true_tokenid, false_tokenid, Yes_tokenid, No_tokenid, yes_tokenid, no_tokenid]])
+    scores = scores[0, :, [false_tokenid, true_tokenid]].float()
+    true_prob = torch.softmax(scores, 1)[:, 1]
+    return true_prob, raw_scores.cpu().numpy()
+
+    
 
 
 
-
+steps = 0
 res_test = defaultdict(dict)
+raw_scores = list()
 with torch.inference_mode():
     for batch_inp in tqdm(dataloader): 
         qids, dids, instr, target = batch_inp
         instr_tokenized= instr.to('cuda')
         target_tokenized = target.to('cuda')
-        scores = get_scores(model, instr_tokenized, target_tokenized)
+        scores, raw_score = get_scores(model, instr_tokenized, target_tokenized, steps<=100)
+        raw_scores.append(raw_score)
         batch_num_examples = scores.shape[0]
         # for each example in batch
         for i in range(batch_num_examples):
             res_test[qids[i]][dids[i]] = scores[i].item()
-
+        steps += 1
     sorted_scores = []
     q_ids = []
     # for each query sort after scores
@@ -141,7 +181,7 @@ with torch.inference_mode():
         q_ids.append(qid)
         sorted_scores.append(sorted_scores_q)
 
-
+pickle.dump(raw_scores, open(output_dir + 'raw_scores.p', 'wb'))
 test = Trec('ndcg_cut_10', 'trec_eval', qrels_file, 1000, ranking_file_path=output_dir)
 eval_score = test.score(sorted_scores, q_ids)
 print(eval_score)

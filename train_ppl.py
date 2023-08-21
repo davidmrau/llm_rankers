@@ -1,5 +1,6 @@
 
 from trl import SFTTrainer
+from trl import SFTTrainer, DataCollatorForCompletionOnlyLM
 from random import randrange
 from datasets import Dataset
 from peft import LoraConfig, prepare_model_for_kbit_training, get_peft_model
@@ -7,6 +8,7 @@ from transformers import TrainingArguments
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 import bitsandbytes as bnb
+response_template = "\n### Question:\n"
 def format_instruction(sample):
     return f"""### Instruction:
 Write a question that this passsage could answer.
@@ -15,12 +17,23 @@ Write a question that this passsage could answer.
 ### Question:
 {sample['query']}"""
 
+def format_instruction(query, doc):
+    return f"""### Instruction:
+Write a question that this passsage could answer.
+### Passage:
+{doc}
+### Question:
+{query}"""
+
+
+response_template_with_context = "\n### Question:\n"
+
 #def format_instruction(sample):
 #    return f"""{sample['positive_document']}<eos>{sample['query']}"""
 
 dataset = Dataset.load_from_disk('data/msmarco/msmarco.10m.hf')
+#print(format_instruction(dataset[randrange(len(dataset))]))
 
-print(format_instruction(dataset[randrange(len(dataset))]))
 
 use_flash_attention = True
 # COMMENT IN TO USE FLASH ATTENTION
@@ -39,7 +52,6 @@ model_id = "meta-llama/Llama-2-7b-hf" # gated
 #model_id = "meta-llama/Llama-2-13b-chat-hf" # gated
 #model_id = "meta-llama/Llama-2-70b-chat-hf" # gated
 
-cache_dir = '/scratch-shared/drautmp/transformers_cache/'
 
 tokenizer = AutoTokenizer.from_pretrained(model_id)
 tokenizer.add_special_tokens({"pad_token":"<pad>"})
@@ -55,7 +67,7 @@ bnb_config = BitsAndBytesConfig(
 )
 
 # Load model and tokenizer
-model = AutoModelForCausalLM.from_pretrained(model_id, quantization_config=bnb_config, use_cache=False, device_map="auto", cache_dir=cache_dir)
+model = AutoModelForCausalLM.from_pretrained(model_id, quantization_config=bnb_config, use_cache=False, device_map="auto")
 model.config.pretraining_tp = 1
 model.config.pad_token_id = tokenizer.pad_token_id
 model.resize_token_embeddings(len(tokenizer))
@@ -109,7 +121,7 @@ model = get_peft_model(model, peft_config)
 print(model.print_trainable_parameters())
 
 args = TrainingArguments(
-    output_dir="llama_models/llama-7-int4-msmarco-rank_all_modules",
+    output_dir="llama_models/llama-7-int4-msmarco-rank_all_modules_response_only",
     max_steps=5000,
     per_device_train_batch_size=32,
     gradient_accumulation_steps=4,
@@ -127,19 +139,32 @@ args = TrainingArguments(
     #disable_tqdm=True # disable tqdm since with packing values are in correct
 )
 
+if use_flash_attention:
+    from utils.llama_patch import upcast_layer_for_flash_attention
+    torch_dtype = torch.bfloat16 if args.bf16 else torch.float16 if args.fp16 else torch.float32
+    model = upcast_layer_for_flash_attention(model, torch_dtype)
 
+response_template_ids = tokenizer.encode(response_template_with_context, add_special_tokens=False)[2:]
+collator = DataCollatorForCompletionOnlyLM(response_template_ids, tokenizer=tokenizer)
 
 
 max_seq_length = 512 # max sequence length for model and packing of the dataset
+
+
+def formatting_prompts_func(example):
+    output_texts = []
+    for i in range(len(example['query'])):
+        text = format_instruction(example['query'][i], example['positive_document'][i])
+        output_texts.append(text)
+    return output_texts
+
 
 trainer = SFTTrainer(
     model=model,
     train_dataset=dataset,
     peft_config=peft_config,
-    max_seq_length=max_seq_length,
-    tokenizer=tokenizer,
-    packing=True,
-    formatting_func=format_instruction,
+    data_collator=collator,
+    formatting_func=formatting_prompts_func,
     args=args,
 )
 
